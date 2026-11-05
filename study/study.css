@@ -1,0 +1,102 @@
+/* Panca study version: green look, the patient browser, the visit line, Előzmény. Loaded after the page's own styles. */
+
+/* ---------- Green accent (so it is never confused with the public / clinical version) ---------- */
+:root { --accent: #1f8a4c; --accent-tint: rgba(31, 138, 76, .13); --study: #1f8a4c; --study-tint: rgba(31, 138, 76, .12); }
+:root[data-theme="dark"] { --accent: #2fb862; --accent-tint: rgba(47, 184, 98, .22); --study: #30d158; --study-tint: rgba(48, 209, 88, .16); }
+
+.study-badge { margin-left: 8px; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700;
+               letter-spacing: .02em; color: #fff; background: var(--study); white-space: nowrap; }
+@media (max-width: 900px) { .study-badge { display: none; } }
+/* with a report open the header must stay one row at 1280 px: the green logo and colour still mark this version */
+@media (max-width: 1500px) { body:has(#toolbar-result:not(.hidden)) .study-badge { display: none; } }
+
+/* ---------- What the study version shows / hides ---------- */
+html.study #audio-open, html.study .saved-card, html.study #logout, html.study .static-note { display: none !important; }
+html.study .starts { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; margin-left: auto; margin-right: auto; }
+@media (max-width: 700px) { html.study .starts { grid-template-columns: 1fr; } }
+.study-note { max-width: 760px; margin: 0 auto 18px; color: var(--muted); font-size: 13px; line-height: 1.45; text-align: center; }
+.study-test { position: fixed; left: 8px; bottom: 8px; z-index: 9999; padding: 3px 10px; border-radius: 999px;
+              font: 700 11px system-ui, sans-serif; letter-spacing: .06em; color: #fff; background: #ff9500; pointer-events: none; }
+
+/* ---------- Tick row under HR (study.js arrangeHeader): the Sport box must not overhang into the HR row ---------- */
+html.study .sport-pair .slot.text { margin: 0; }
+html.study .line:has(.sport-pair) { margin-top: 6px; }
+html.study .flow:has(> .sport-pair) { align-items: center; }   /* the other ticks level with Sport (taller: its box) */
+
+/* ---------- Visit + exam date, next to name / TAJ in the Fejléc ---------- */
+.patient-line select, .patient-line input[type="date"] { font: inherit; font-size: .9375rem; border: 0; border-radius: 8px;
+  padding: 5px 9px; background: var(--fill-2); color: var(--text); }
+.patient-line select:focus, .patient-line input[type="date"]:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.patient-line .need { box-shadow: inset 0 0 0 1.5px var(--orange); }
+.visit-hint { flex-basis: 100%; font-size: .75rem; color: var(--muted); margin-top: -4px; }
+.visit-hint.warn { color: var(--orange-text); }
+.study-state { font-size: .75rem; color: var(--muted); margin-left: auto; align-self: center; }
+.study-state.ro { color: var(--orange-text); font-weight: 600; }
+#study-history-btn { display: inline-flex; align-items: center; gap: 6px; }
+#study-history-btn[disabled] { opacity: .45; pointer-events: none; }
+@media (max-width: 1330px) { #study-history-btn span { display: none; } }
+
+/* ---------- The patient browser (home page) ---------- */
+.study-card .sb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.study-card h2 { margin: 0; font-size: 1.125rem; }
+.study-card .sb-head input[type="search"] { flex: 1; min-width: 200px; font: inherit; padding: 7px 11px; border-radius: 9px; border: 0;
+  background: var(--fill-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--sep); }
+.study-card .sb-head input[type="search"]:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.sb-folder { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.sb-folder b { color: var(--text); }
+.sb-setup { text-align: center; padding: 18px 10px 10px; }
+.sb-setup p { color: var(--muted); font-size: .875rem; margin: 0 auto 14px; max-width: 560px; line-height: 1.45; }
+.sb-empty { color: var(--muted); padding: 14px 0; }
+.sb-warn { background: var(--orange-tint); color: var(--orange-text); border-radius: 10px; padding: 8px 12px; font-size: .8125rem; margin: 6px 0; }
+
+.sb-patient { border-top: 1px solid var(--sep); }
+.sb-prow { display: grid; grid-template-columns: 22px minmax(140px, 1.4fr) 110px minmax(200px, 2fr) auto; align-items: center;
+           gap: 10px; padding: 9px 4px; cursor: pointer; border-radius: 8px; }
+.sb-prow:hover { background: var(--fill-2); }
+.sb-prow .chev { color: var(--muted); transition: transform .2s; }
+.sb-patient.open .sb-prow .chev { transform: rotate(90deg); }
+.sb-prow .pname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-prow .ptaj { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .875rem; }
+.sb-prow .pflags { display: flex; gap: 6px; justify-content: flex-end; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font-size: .6875rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--fill); color: var(--faint); }
+.chip.done { background: var(--study-tint); color: var(--study); }
+.chip.extra { background: var(--fill); color: var(--muted); }
+.tag { font-size: .6875rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag.edit { background: var(--yellow-tint); color: var(--yellow-text); }
+.tag.conflict { background: var(--red-tint); color: var(--red); }
+.sb-exams { padding: 2px 4px 12px 36px; }
+.sb-exams table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.sb-exams th { text-align: left; font-size: .75rem; font-weight: 600; color: var(--muted); padding: 4px 8px; }
+.sb-exams td { padding: 6px 8px; border-top: 1px solid var(--sep); vertical-align: middle; }
+.sb-exams td.acts { text-align: right; white-space: nowrap; }
+.sb-exams td.acts button { margin-left: 6px; }
+.sb-exams .meta { color: var(--muted); font-size: .75rem; }
+.sb-exams tr.conflict td { background: var(--red-tint); }
+.sb-pacts { display: flex; gap: 8px; margin-top: 8px; }
+@media (max-width: 760px) {
+  .sb-prow { grid-template-columns: 18px 1fr auto; }
+  .sb-prow .ptaj, .sb-prow .chips { display: none; }
+  .sb-exams { padding-left: 4px; }
+}
+
+/* ---------- Dialogs (inside the page's #acct-dlg card) ---------- */
+.dlg-card select { font: inherit; width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px;
+                   border: 1px solid var(--sep); background: var(--card-2); color: var(--text); }
+.dlg-card .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.dlg-card .hint { font-size: .75rem; color: var(--muted); margin-top: 6px; min-height: 1em; }
+.dlg-card .hint.warn { color: var(--orange-text); }
+.dlg-card .dlg-buttons button.danger { color: var(--red); }
+
+/* ---------- Előzmény (side panel) ---------- */
+.hist-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.hist-tabs button.on { background: var(--accent); color: #fff; }
+.hist-meta { font-size: .8125rem; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+.hist-meta b { color: var(--text); }
+.hist-ro { display: inline-block; font-size: .6875rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+           background: var(--fill); color: var(--muted); margin-left: 6px; }
+.hist-cmp { width: 100%; border-collapse: collapse; font-size: .8125rem; margin: 4px 0 14px; }
+.hist-cmp th { text-align: left; font-size: .75rem; color: var(--muted); font-weight: 600; padding: 3px 6px; }
+.hist-cmp td { padding: 3px 6px; border-top: 1px solid var(--sep); font-variant-numeric: tabular-nums; }
+.hist-cmp td.diff { font-weight: 600; }
+.hist-h { font-size: .8125rem; font-weight: 600; margin: 12px 0 6px; }

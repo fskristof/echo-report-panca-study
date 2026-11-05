@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Placeholder logo for the Panca study version (green; heart + pancreas). Replace with the final logo. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fae6a"/>
+      <stop offset="1" stop-color="#1c6b40"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- heart outline -->
+  <path d="M256 150c-22-44-62-70-104-70-58 0-96 46-96 102 0 74 76 132 140 186"
+        fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+  <path d="M256 150c22-44 62-70 104-70 58 0 96 46 96 102 0 22-6 42-16 60"
+        fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+  <!-- pancreas: head (left), body, tapering tail (right) -->
+  <path d="M150 352c-6-34 18-62 50-64 26-2 40 14 66 14 40 0 76-30 124-36 30-4 52 8 54 26 2 20-18 30-44 34
+           -46 8-78 30-126 44-30 9-52 6-66 18-14 13-12 38-34 40-14 1-20-14-24-76z"
+        fill="#fff"/>
+  <path d="M196 336c18 4 30 16 34 30" fill="none" stroke="#2a8a52" stroke-width="10" stroke-linecap="round"/>
+</svg>
