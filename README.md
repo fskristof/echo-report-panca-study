@@ -13,7 +13,7 @@ holds program code only.
 1. Install OneDrive and sign in with the account that holds the study folder (e.g. `Panca echo`).
 2. In File Explorer, right-click the study folder → **Always keep on this device**. Chrome then reads real files,
    not cloud placeholders, and it also works if the internet drops for a moment.
-3. Open the study page in **Chrome** (the address comes after publishing to GitHub Pages).
+3. Open the study page in **Chrome**: https://fskristof.github.io/echo-report-panca-study/ (bookmark it).
 4. **Mappa kiválasztása** → choose the study folder → give this computer a name (e.g. "Echo labor 1").
    When Chrome asks, choose **Allow on every visit**. Otherwise, after a browser restart the page asks once
    (**Hozzáférés engedélyezése**).
@@ -71,3 +71,6 @@ The study code lives in `study/`: `study.js` (storage, browser, Előzmény, expo
 Both use the browser's own private storage as the "folder" (orange TESZT MÓD label). Never use it for study data.
 
 Local preview: `python3 -m http.server 8811 --directory docs`, then http://localhost:8811/.
+
+**Publishing an update:** rebuild, check locally, then `git add -A && git commit && git push`. GitHub Pages
+redeploys in about a minute; the study files' fingerprint in their URLs makes both computers load the new version.

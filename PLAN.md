@@ -2,8 +2,9 @@
 
 Agreed plan (2026-11-05). **Built 2026-11-05** from echo-report 885b9d8 (see README.md):
 build_study.py + study/ → docs/. Tested in Chrome test mode (two tabs as two computers).
-Not yet done: test with a real OneDrive folder on the study PCs; create and publish the
-GitHub repo `echo-report-panca-study` (only with the user's OK).
+**Published 2026-11-05**: repo fskristof/echo-report-panca-study, GitHub Pages from main /docs,
+https://fskristof.github.io/echo-report-panca-study/ (live site checked in test mode).
+Not yet done: test with a real OneDrive folder on the study PCs.
 
 ## Goal
 
