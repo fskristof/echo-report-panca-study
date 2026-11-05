@@ -285,7 +285,7 @@
 
   // leaving the report for the home page: the editing note goes, the list is read again
   const pageShowScreen = showScreen;
-  showScreen = function (name) { if (name === "home") resetCur(); pageShowScreen(name); };
+  showScreen = function (name) { if (name === "home") { resetCur(); bpAskedAt = 0; } pageShowScreen(name); };
 
   // the visit and date count as changes too
   const pageSnapshot = snapshot;
@@ -501,6 +501,7 @@
     finally { saving = false; }
   };
   async function doSave() {
+    if (!(await bloodPressureOk("save"))) return false;
     if (!(await ensureRepo())) return false;
     if (!pcName() && !(await askPcName())) return false;
     const metaOk = state.patient.name.trim() && tajDigits(state.patient.taj).length === 9 && cur.visit && cur.date;
@@ -594,6 +595,38 @@
     toast("Mentve: " + tajShown(taj) + " · " + visitLabel(cur.visit) + " · " + shownDay(cur.date));
     return true;
   }
+
+  /* ---------------- Reminder: the blood pressure (measured lying down) ---------------- */
+  // Asked when saving and when going to the Kezdőlap with an exam open but no blood pressure. "Mentés így" /
+  // "Tovább" lets a half-done exam be saved; the Kezdőlap path asks only once (not again in its own save).
+  let bpAskedAt = 0;                               // the Kezdőlap path already asked (valid until home, max 1 min)
+  const bpMissing = () => ["bp_sys", "bp_dia"].some((k) => state.fields[k] && !state.fields[k].input.value.trim());
+  async function bloodPressureOk(why) {
+    if (Date.now() - bpAskedAt < 60000) { bpAskedAt = 0; return true; }
+    if (!bpMissing()) return true;
+    const c = await askChoice("Hiányzik a vérnyomás",
+      "Ne felejtsd el a fekvő helyzetben mért vérnyomást! Ha a vizsgálat még tart, mentheted most is, és később pótolhatod.",
+      [["back", "Vissza, beírom"], ["go", why === "save" ? "Mentés vérnyomás nélkül" : "Tovább a kezdőlapra", "primary"]]);
+    if (c === "go") return true;
+    const f = state.fields.bp_sys && !state.fields.bp_sys.input.value.trim() ? state.fields.bp_sys : state.fields.bp_dia;
+    if (f) {
+      const card = f.cell.closest(".card.section");
+      if (card && card.classList.contains("collapsed")) setFolded(card, false);
+      f.cell.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => f.input.focus(), 300);
+    }
+    return false;
+  }
+  // Kezdőlap: asked before the page's own handler (which may then ask to save: that save does not ask again)
+  $("home-btn").addEventListener("click", async (e) => {
+    if (e.bpChecked || $("result").classList.contains("hidden") || !hasContent() || !bpMissing()) return;
+    e.stopImmediatePropagation();
+    if (!(await bloodPressureOk("home"))) return;
+    bpAskedAt = Date.now();
+    const again = new MouseEvent("click", { bubbles: true });
+    again.bpChecked = true;
+    $("home-btn").dispatchEvent(again);
+  }, true);
 
   /* ---------------- Opening a saved exam for editing ---------------- */
   async function openExam(taj, file, skipLockCheck) {
