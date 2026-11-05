@@ -16,6 +16,7 @@ Patient data never goes into docs/: it lives only in the folder chosen in the br
 
 import argparse
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,21 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE / "docs"
 STUDY = HERE / "study"
 DEFAULT_ECHO = Path.home() / "Projects" / "Echo dictation"
+# The password screen (study/gate.js): the password is read from this file (or the PANCA_GATE_PASSWORD environment
+# variable). The file is git-ignored and never published: only a salted SHA-256 fingerprint goes into the site.
+GATE_FILE = HERE / "gate_password.txt"
+GATE_SALT = "panca-echo-study:"                    # must match SALT in study/gate.js
+
+
+def gate_hash(no_gate):
+    if no_gate:
+        return ""
+    pw = os.environ.get("PANCA_GATE_PASSWORD")
+    if pw is None and GATE_FILE.exists():
+        pw = GATE_FILE.read_text(encoding="utf-8").strip()
+    if not pw:
+        sys.exit(f"HIBA: nincs jelszó. Írd a jelszót ide: {GATE_FILE.name} (egy sor), vagy építs --no-gate kapcsolóval.")
+    return hashlib.sha256((GATE_SALT + pw).encode("utf-8")).hexdigest()
 
 
 def patches(asset_version):
@@ -45,7 +61,7 @@ def patches(asset_version):
         ("if (isDirty() && STATIC) {", "if (isDirty() && STATIC && !window.ECHO_STUDY) {"),
         # the Save button calls saveReport by name, so study.js's version is used
         ('$("save").addEventListener("click", saveReport);', '$("save").addEventListener("click", () => saveReport());'),
-        ("</head>", f'<script>window.ECHO_STUDY = true;</script>\n'
+        ("</head>", f'<script src="study/gate.js?v={v}"></script>\n<script>window.ECHO_STUDY = true;</script>\n'
                     f'<link rel="stylesheet" href="study/study.css?v={v}">\n</head>'),
         ("</body>", f'<script src="study/study.js?v={v}"></script>\n</body>'),
     ]
@@ -54,7 +70,9 @@ def patches(asset_version):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--echo", type=Path, default=DEFAULT_ECHO, help="the echo-report checkout")
+    ap.add_argument("--no-gate", action="store_true", help="build without the password screen")
     args = ap.parse_args()
+    gate = gate_hash(args.no_gate)
     echo = args.echo.resolve()
     if not (echo / "build_public.py").exists():
         sys.exit(f"HIBA: nincs build_public.py itt: {echo}")
@@ -82,7 +100,12 @@ def main():
     for f in sorted(STUDY.rglob("*")):
         if f.is_file():
             h.update(f.read_bytes())
+    h.update(gate.encode())                          # a new password = new URLs: every computer gets the new screen
     asset_version = h.hexdigest()[:10]
+    gate_js = OUT / "study" / "gate.js"
+    js = gate_js.read_text(encoding="utf-8")
+    assert js.count("__GATE_HASH__") == 1
+    gate_js.write_text(js.replace("__GATE_HASH__", gate or "none"), encoding="utf-8")
 
     print("3. Az oldal módosítása...")
     page_path = OUT / "index.html"

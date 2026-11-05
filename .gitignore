@@ -4,3 +4,5 @@ __pycache__/
 [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/
 *.csv
 .claude/
+# the password screen's password: never committed (only its fingerprint is published)
+gate_password.txt

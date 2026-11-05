@@ -72,5 +72,11 @@ Both use the browser's own private storage as the "folder" (orange TESZT MÓD la
 
 Local preview: `python3 -m http.server 8811 --directory docs`, then http://localhost:8811/.
 
+**Password screen:** the page asks for a password once per computer (then remembers it). It only keeps out
+someone who opens the address by accident; patient data is never on the site anyway. The password lives in
+`gate_password.txt` in this folder (one line, git-ignored, never published); the build puts only a salted SHA-256
+fingerprint into the site. To change it: edit the file, rebuild, push. Every computer then asks for the new one.
+`--no-gate` builds without the screen.
+
 **Publishing an update:** rebuild, check locally, then `git add -A && git commit && git push`. GitHub Pages
 redeploys in about a minute; the study files' fingerprint in their URLs makes both computers load the new version.
