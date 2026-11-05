@@ -139,13 +139,23 @@
       try { if ((await repo.dir.queryPermission({ mode: "readwrite" })) !== "granted") repo.status = "prompt"; }
       catch (e) { repo.status = "prompt"; }
     }
+    if (repo.status === "ok" && !(await repoAlive())) repo.status = "missing";
     if (repo.status === "ok") return true;
     if (repo.status === "unsupported") { alert("Ez a böngésző nem tud mappába menteni. Használd a Chrome-ot."); return false; }
-    if (repo.status === "prompt" && (await grantFolder())) return true;
-    const choice = await askChoice("Válaszd ki a vizsgálat mappáját",
-      "A leletek a Panca vizsgálat közös OneDrive mappájába mentődnek. Válaszd ki ezt a mappát.",
+    if (repo.status === "prompt" && (await grantFolder()) && (await repoAlive())) return true;
+    if (repo.status === "prompt" || repo.status === "missing") repo.status = repo.dir && !(await repoAlive()) ? "missing" : repo.status;
+    const missing = repo.status === "missing";
+    const choice = await askChoice(missing ? "A mappa nem található" : "Válaszd ki a vizsgálat mappáját",
+      missing ? `A(z) „${repo.dir.name}” mappát átnevezték, áthelyezték vagy törölték. Válaszd ki újra a vizsgálat mappáját.`
+              : "A leletek a Panca vizsgálat közös OneDrive mappájába mentődnek. Válaszd ki ezt a mappát.",
       [["cancel", "Mégse"], ["pick", "Mappa kiválasztása", "primary"]]);
     return choice === "pick" && (await chooseFolder());
+  }
+  // the folder chosen earlier still exists? (renamed / moved / deleted folders break Chrome's link to it)
+  async function repoAlive() {
+    if (!repo.dir) return false;
+    try { for await (const _ of repo.dir.keys()) break; return true; }
+    catch (e) { return e.name === "NotAllowedError" || e.name === "SecurityError"; }   // only a permission question
   }
 
   /* ---------------- This computer's name (who saved / who is editing) ---------------- */
@@ -639,7 +649,7 @@
   }
 
   /* ---------------- The patient browser on the home page ---------------- */
-  const browser = { open: new Set(), query: "", timer: null };
+  const browser = { open: new Set(), closed: new Set(), query: "", timer: null };   // closed: closed by hand during a search
   function ensureBrowser() {
     if ($("study-card")) return;
     const note = el("p", "study-note");
@@ -676,7 +686,14 @@
     }
     if (repo.status !== "ok") {
       const setup = el("div", "sb-setup");
-      if (repo.status === "prompt") {
+      if (repo.status === "missing") {
+        setup.append(el("div", "sb-warn", `A korábban kiválasztott „${repo.dir.name}” mappa nem található: átnevezték, ` +
+                                          "áthelyezték vagy törölték (vagy a OneDrive még nem töltötte le)."),
+          el("p", "", "Válaszd ki újra a vizsgálat mappáját (az új nevén vagy helyén). A mentett vizsgálatok a mappában vannak, " +
+                      "nem vesznek el."),
+          button("Mappa kiválasztása", "primary", async () => { if (await chooseFolder()) drawBrowser(true); }), " ",
+          button("Újrapróbálás", "", async () => { repo.status = "ok"; drawBrowser(true); }));
+      } else if (repo.status === "prompt") {
         setup.append(el("p", "", `A böngésző újra engedélyt kér a(z) „${repo.dir.name}” mappához (biztonsági okból, ` +
                                  "a böngésző újraindítása után egyszer)."),
           button("Hozzáférés engedélyezése", "primary", async () => { await grantFolder(); drawBrowser(true); }), " ",
@@ -693,7 +710,12 @@
       try { await scanRepo(); }
       catch (e) {
         if (e.name === "NotAllowedError" || e.name === "SecurityError") { repo.status = "prompt"; return drawBrowser(false); }
-        card.replaceChildren(el("h2", "", "Betegek"), el("div", "sb-warn", "A mappa nem olvasható: " + e.message));
+        if (e.name === "NotFoundError" || !(await repoAlive())) { repo.status = "missing"; return drawBrowser(false); }
+        card.replaceChildren(el("h2", "", "Betegek"), el("div", "sb-warn", "A mappa nem olvasható: " + e.message),
+          el("div", "sb-pacts"),
+        );
+        card.lastChild.append(button("Újrapróbálás", "", () => drawBrowser(true)),
+                              button("Másik mappa kiválasztása", "", async () => { if (await chooseFolder()) drawBrowser(true); }));
         return;
       }
     }
@@ -701,7 +723,7 @@
     const search = el("input");
     search.type = "search"; search.placeholder = "Keresés: név, TAJ, dátum"; search.value = browser.query;
     search.setAttribute("aria-label", "Keresés a betegek között");
-    search.addEventListener("input", () => { browser.query = search.value; drawList(); });
+    search.addEventListener("input", () => { browser.query = search.value; browser.closed.clear(); drawList(); });
     head.append(el("h2", "", "Betegek"), search,
       button("Új beteg", "primary", () => newExam(null), "Új beteg első vizsgálata"),
       button("Frissítés", "", () => drawBrowser(true), "A mappa újraolvasása (a másik gép mentései)"),
@@ -737,7 +759,7 @@
     for (const p of rows) list.append(patientRow(p, !!q && rows.length <= 3));
   }
   function patientRow(p, autoOpen) {
-    const box = el("div", "sb-patient" + (browser.open.has(p.taj) || autoOpen ? " open" : ""));
+    const box = el("div", "sb-patient" + (browser.open.has(p.taj) || (autoOpen && !browser.closed.has(p.taj)) ? " open" : ""));
     const row = el("div", "sb-prow");
     const chev = el("span", "chev", "›");
     const chips = el("div", "chips");
@@ -757,8 +779,11 @@
     row.addEventListener("click", () => {
       const open = !box.classList.contains("open");
       box.classList.toggle("open", open);
-      if (open) browser.open.add(p.taj); else browser.open.delete(p.taj);
-      if (open && !box.querySelector(".sb-exams")) box.append(examsTable(p));
+      if (open) { browser.open.add(p.taj); browser.closed.delete(p.taj); }
+      else { browser.open.delete(p.taj); browser.closed.add(p.taj); }
+      const table = box.querySelector(".sb-exams");
+      if (open && !table) box.append(examsTable(p));
+      if (!open && table) table.remove();
     });
     box.append(row);
     if (box.classList.contains("open")) box.append(examsTable(p));

@@ -66,6 +66,7 @@ html.study .flow:has(> .sport-pair) { align-items: center; }   /* the other tick
 .tag.edit { background: var(--yellow-tint); color: var(--yellow-text); }
 .tag.conflict { background: var(--red-tint); color: var(--red); }
 .sb-exams { padding: 2px 4px 12px 36px; }
+.sb-patient:not(.open) .sb-exams { display: none; }
 .sb-exams table { width: 100%; border-collapse: collapse; font-size: .875rem; }
 .sb-exams th { text-align: left; font-size: .75rem; font-weight: 600; color: var(--muted); padding: 4px 8px; }
 .sb-exams td { padding: 6px 8px; border-top: 1px solid var(--sep); vertical-align: middle; }

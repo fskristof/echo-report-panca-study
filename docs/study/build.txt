@@ -1,1 +1,1 @@
-echo-report 885b9d8, 2026-11-05; study 9c5d6a5bfb
+echo-report 885b9d8, 2026-11-05; study e8a3aba407
