@@ -1,0 +1,4 @@
+# The echo-report commit the Panca study site is built from (build_study.py). Change it only on purpose:
+#   python build_study.py --echo-ref <commit>   (test in test mode)   then add --save-pin
+# echo-report 885b9d8, 2026-11-05 (the version the study started with), pinned 2026-11-09
+885b9d8773735600760b5e47842da6aa5e37af8a

@@ -21,7 +21,13 @@ html.study .starts { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width
 /* ---------- Tick row under HR (study.js arrangeHeader): the Sport box must not overhang into the HR row ---------- */
 html.study .sport-pair .slot.text { margin: 0; }
 html.study .line:has(.sport-pair) { margin-top: 6px; }
-html.study .flow:has(> .sport-pair) { align-items: center; }   /* the other ticks level with Sport (taller: its box) */
+html.study .flow:has(> .sport-pair) { align-items: center; }
+
+/* ---------- A tick next to number boxes (L hullám after E / A, E/A, DT): level with the boxes, not at their top ---------- */
+html.study .line > .cell.tick-first { align-self: center; }
+
+/* ---------- One report layout: KAEC (the study's PBEC uses the same report box), no place picker ---------- */
+html.study #place, html.study select.place-sync, html.study #place-ask { display: none !important; }   /* the other ticks level with Sport (taller: its box) */
 
 /* ---------- Visit + exam date, next to name / TAJ in the Fejléc ---------- */
 .patient-line select, .patient-line input[type="date"] { font: inherit; font-size: .9375rem; border: 0; border-radius: 8px;
@@ -53,7 +59,9 @@ html.study .flow:has(> .sport-pair) { align-items: center; }   /* the other tick
 .sb-prow { display: grid; grid-template-columns: 22px minmax(140px, 1.4fr) 110px minmax(200px, 2fr) auto; align-items: center;
            gap: 10px; padding: 9px 4px; cursor: pointer; border-radius: 8px; }
 .sb-prow:hover { background: var(--fill-2); }
-.sb-prow .chev { color: var(--muted); transition: transform .2s; }
+/* the open / close arrow: a centred square, so turning it keeps it in place (not from the left edge to the top) */
+.sb-prow .chev { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; justify-self: center;
+                 color: var(--muted); transition: transform .2s; transform-origin: 50% 50%; }
 .sb-patient.open .sb-prow .chev { transform: rotate(90deg); }
 .sb-prow .pname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-prow .ptaj { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .875rem; }

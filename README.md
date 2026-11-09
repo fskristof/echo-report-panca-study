@@ -20,9 +20,12 @@ holds program code only.
 
 Both computers must choose **the same** OneDrive folder.
 
+One report layout only: **KAEC** (the study's reports go into PBEC, which has the same report box). There is no
+place picker and no "Hol dolgozol ma?" question. Elbocsátás has no fixed day, so it gets no expected date.
+
 ## Daily use
 
-- **Új beteg**: name, TAJ (checked), visit (Baseline / 1 hét / 1 hónap / 1 év / Egyéb), exam date → empty form.
+- **Új beteg**: name, TAJ (checked), visit (Baseline / Elbocsátás / 1 hónap / 1 év / Egyéb), exam date → empty form.
 - Click a patient → their exams. **Új vizsgálat** suggests the next missing visit and shows the expected date
   (from the baseline). **Megnyitás** = edit, **Előzmény** = view only.
 - While editing, the clock button in the header (**Előzmény**) shows the patient's earlier exams next to the
@@ -49,19 +52,46 @@ choosing the right version (open it and save).
   <TAJ>/
     patient.json                  name, TAJ
     2026-11-09_baseline.json      one exam: boxes, texts, all values, report text, visit, date, who/when saved
-    2026-11-16_1het.json
+    2026-11-12_1het.json          Elbocsátás (the file id stays "1het": it was called "1 hét" until 2026-11-09)
     2026-11-16_1het.lock.json     only while the exam is open for editing somewhere
 ```
 
 ## Building / updating
 
+The study site is **separate from echo-report and pinned to one echo-report version** (`echo_pin.txt`, now
+885b9d8 of 2026-11-05, the version the study started with). Changes in echo-report never reach the study by
+themselves: the study site changes only when it is built here and pushed. Study fixes are developed and tested in
+this repo only.
+
+**Study fix** (`study/` changed: patient browser, look, saving; the usual case):
+
+```bash
+python3 build_study.py --study-only
+```
+
+It refreshes `docs/study` and the version in the study file URLs, and keeps the built page, its echo-report version
+and the published password (no echo-report checkout or `gate_password.txt` needed).
+
+**Full build from the pinned version** (e.g. after changing `patches()` or the password):
+
 ```bash
 python3 build_study.py
 ```
 
-This runs `build_public.py` in `~/Projects/Echo dictation` (`--echo <path>` for another checkout), copies the
-result into `docs/`, adds `study/` and applies a few checked patches to `index.html`. Rebuild after every change in
-echo-report so the study version gets the new features. If the build stops with "a javítás helye 0× található",
+It checks the pinned commit out into a temporary git worktree of the echo-report checkout (`~/Projects/Echo
+dictation` or `~/Projects_cvc/Echo report dictation_CVC`, or `--echo <path>`), runs `build_public.py` there, copies
+the result into `docs/`, adds `study/`, applies a few checked patches to `index.html` and removes the worktree.
+The echo-report folder itself (its branch, unfinished work) is not touched. Rebuilding with the same pin gives the
+same page.
+
+**Taking a change of the main program into the study** (e.g. a calculation fix), on purpose only:
+
+```bash
+python3 build_study.py --echo-ref <commit>
+```
+
+Test it in test mode (below). If good: run it again with `--save-pin` (writes `echo_pin.txt`), then commit and push.
+If not: `python3 build_study.py` puts the pinned version back. If the build stops with "a javítás helye 0× található",
 the echo-report page changed where a patch goes: update `patches()` in `build_study.py`.
 
 The study code lives in `study/`: `study.js` (storage, browser, Előzmény, export), `study.css` (look),

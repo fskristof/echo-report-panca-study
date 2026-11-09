@@ -19,7 +19,9 @@
   const FORMAT = "echo-panca-exam";
   const VISITS = [
     { id: "baseline", label: "Baseline" },
-    { id: "1het", label: "1 hét", add: [0, 0, 7], tol: 3 },
+    // the discharge exam: no fixed day after the baseline, so no expected date / tolerance. The id stays "1het"
+    // (it was "1 hét" until 2026-11-09): the files saved under that name keep working and show as Elbocsátás.
+    { id: "1het", label: "Elbocsátás" },
     { id: "1honap", label: "1 hónap", add: [0, 1, 0], tol: 10 },
     { id: "1ev", label: "1 év", add: [1, 0, 0], tol: 45 },
     { id: "egyeb", label: "Egyéb" },
@@ -32,6 +34,9 @@
   // Test mode (?teszt): the browser's own private storage instead of a real folder; two tabs = two computers
   // (?teszt&gep=Gep2). Never used for study data.
   const TEST = params.has("teszt");
+  // The study's reports are pasted into PBEC, which has the same report box as KAEC: always the KAEC layout,
+  // no place picker (study.css hides it, and the "Hol dolgozol ma?" question).
+  const PLACE = "KAEC";
 
   const visitLabel = (id) => (VISITS.find((v) => v.id === id) || { label: id || "" }).label;
   const pad = (n) => String(n).padStart(2, "0");
@@ -76,7 +81,9 @@
     let file;
     try { file = await (await dir.getFileHandle(name)).getFile(); }
     catch (e) { if (e.name === "NotFoundError" || e.name === "TypeMismatchError") return null; throw e; }
-    const text = await file.text();
+    let text;
+    try { text = await file.text(); }               // removed between listing and reading (a lock note just cleared)
+    catch (e) { if (e.name === "NotFoundError" || e.name === "NotReadableError") return null; throw e; }
     try { return { data: JSON.parse(text), lastModified: file.lastModified }; }
     catch (e) { return { data: null, broken: true, lastModified: file.lastModified }; }
   }
@@ -643,7 +650,7 @@
       if (c === "view") { openSide({ kind: "history", key: taj, id: file }); return; }
       if (c !== "open") return;
     }
-    if (["KAEC", "KARU"].includes(exam.place)) $("place").value = exam.place;
+    $("place").value = PLACE;
     const res = await call("/render", { values: exam.values || {}, texts: exam.texts || {}, egyeb: exam.egyeb || "",
                                         transcript: "", place: $("place").value });
     const out = await res.json();
@@ -740,10 +747,20 @@
       return;
     }
     if (rescan || !cache.patients) {
-      try { await scanRepo(); }
-      catch (e) {
+      let err = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try { await scanRepo(); err = null; break; }
+        catch (e) {
+          err = e;
+          // a file or a lock note removed while the folder was being read (the other computer, or this page leaving
+          // an exam) also gives NotFoundError: only a folder that is really gone counts as "missing"; else read again
+          if (e.name !== "NotFoundError" || !(await repoAlive())) break;
+        }
+      }
+      if (err) {
+        const e = err;
         if (e.name === "NotAllowedError" || e.name === "SecurityError") { repo.status = "prompt"; return drawBrowser(false); }
-        if (e.name === "NotFoundError" || !(await repoAlive())) { repo.status = "missing"; return drawBrowser(false); }
+        if (!(await repoAlive())) { repo.status = "missing"; return drawBrowser(false); }
         card.replaceChildren(el("h2", "", "Betegek"), el("div", "sb-warn", "A mappa nem olvasható: " + e.message),
           el("div", "sb-pacts"),
         );
@@ -794,7 +811,9 @@
   function patientRow(p, autoOpen) {
     const box = el("div", "sb-patient" + (browser.open.has(p.taj) || (autoOpen && !browser.closed.has(p.taj)) ? " open" : ""));
     const row = el("div", "sb-prow");
-    const chev = el("span", "chev", "›");
+    const chev = el("span", "chev");
+    chev.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
     const chips = el("div", "chips");
     for (const v of SCHEDULE) {
       const e = p.exams.find((x) => x.visit === v.id);
@@ -1018,6 +1037,9 @@
     });
   });
 
+  $("place").value = PLACE;
+  try { localStorage.setItem("place", JSON.stringify({ place: PLACE, day: "study" })); } catch (e) {}
+  $("place-ask").classList.add("hidden");
   addHistoryButton();
   initRepo().then(drawProfile);
   // the home page was drawn before this script ran (startAccount → enterHome): draw the browser now
