@@ -120,3 +120,8 @@ html.study #place, html.study select.place-sync, html.study #place-ask { display
   box-shadow: inset 0 0 0 1px var(--sep); }
 .study-note-box textarea:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .hist-note { white-space: pre-wrap; font-size: .8125rem; padding: 8px 10px; border-radius: 9px; background: var(--study-tint); }
+
+/* ---------- Előzmény: the measured values under the report, folded by default ---------- */
+.hist-values { margin: 12px 0 4px; border-top: 1px solid var(--sep); padding-top: 8px; }
+.hist-values summary { font-size: .8125rem; padding: 4px 0; }
+.hist-values[open] summary { margin-bottom: 4px; }

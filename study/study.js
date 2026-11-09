@@ -754,6 +754,7 @@
   }
 
   /* ---------------- The patient browser on the home page ---------------- */
+  let histValuesOpen = false;                       // Előzmény: the "Mért értékek" fold, closed by default
   const browser = { open: new Set(), closed: new Set(), query: "", timer: null };   // closed: closed by hand during a search
   function ensureBrowser() {
     if ($("study-card")) return;
@@ -999,9 +1000,16 @@
     // the values next to the ones being typed now (same patient)
     const values = exam.all_values || exam.values || {};
     const keys = meta.fields.map((f) => f.key).filter((k) => values[k] !== undefined && values[k] !== "");
+    let valuesBox = null;
     if (keys.length) {
       const sameNow = editingHere || (!$("result").classList.contains("hidden") && tajDigits(state.patient.taj) === p.taj);
-      parts.push(el("div", "hist-h", sameNow ? "Értékek: akkor és most" : "Értékek"));
+      // under the report, folded by default (2026-11-09); stays open / closed while switching between exams
+      valuesBox = el("details", "hist-values");
+      valuesBox.open = histValuesOpen;
+      valuesBox.addEventListener("toggle", () => { histValuesOpen = valuesBox.open; });
+      const sum = el("summary");                   // (the page's own fold arrow, as on every other fold)
+      sum.append(el("span", "", (sameNow ? "Mért értékek: akkor és most" : "Mért értékek") + ` (${keys.length})`));
+      valuesBox.append(sum);
       const t = el("table", "hist-cmp"), hr = el("tr");
       hr.append(el("th", "", ""), el("th", "", shownDay(exam.exam_date)));
       if (sameNow) hr.append(el("th", "", "Most"));
@@ -1022,10 +1030,11 @@
         }
         t.append(tr);
       }
-      parts.push(t);
+      valuesBox.append(t);
     }
     parts.push(el("div", "hist-h", "Lelet"));
     parts.push(el("pre", "report-view" + (exam.place === "KARU" ? " proportional" : ""), exam.report_text || "(üres)"));
+    if (valuesBox) parts.push(valuesBox);
     body.replaceChildren(...parts);
   }
 
