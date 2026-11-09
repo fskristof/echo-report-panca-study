@@ -51,24 +51,6 @@ place picker and no "Hol dolgozol ma?" question. Elbocsátás has no fixed day, 
 **Working rule:** one exam is entered on one computer. Delete OneDrive conflict copies by hand in the folder after
 choosing the right version (open it and save).
 
-## Backup of the patient data
-
-`backup/panca_backup.ps1` zips the whole study folder into a dated file (`PANCA_<date>_<time>.zip`, default
-`C:\PancaBackup`), checks that every file is in it, then copies the zips that are missing to a USB stick (found by its
-volume label) and / or network folders. A missing stick or computer is only logged and caught up on the next run.
-Nothing is deleted (a few KB per exam). A missing or empty study folder stops it with an error and a message box, so
-a broken OneDrive link never looks like a good backup. Log: `backup.log` in the backup folder.
-
-Set up as a weekly scheduled task (no admin rights; the folder name is given here, never stored in this repository):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File backup\install_backup_task.ps1 -Source "<study folder>" -UsbLabel "<stick label>" -Day Friday -Time 17:00
-```
-
-Add network folders with `-Extra "\\pc\share\PancaBackup"` (several: `"a;b"`). Running it again replaces the task.
-If the computer is off at that time, the backup runs at the next start. Restore: unzip a backup and copy the patient
-folders back into the study folder (or open a single exam file from it).
-
 ## Folder layout
 
 ```

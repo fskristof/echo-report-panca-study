@@ -6,3 +6,5 @@ __pycache__/
 .claude/
 # the password screen's password: never committed (only its fingerprint is published)
 gate_password.txt
+# the backup scripts: kept on this computer only (not in the public repository)
+backup/
