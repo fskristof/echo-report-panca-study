@@ -31,6 +31,12 @@ place picker and no "Hol dolgozol ma?" question. Elbocsátás has no fixed day, 
 - While editing, the clock button in the header (**Előzmény**) shows the patient's earlier exams next to the
   current values (changed values in bold).
 - **Mentés** saves into the folder. The visit and date can be changed in the Fejléc; the file name follows them.
+- **Vizsgálati megjegyzés** (green box in the Fejléc): saved with the exam, shown in Előzmény and the export, never
+  in the lelet.
+- **2 decimals for the study data**: EF, EDV, ESV, SV and every strain value are stored (`precise_values` in the exam
+  file) and exported rounded to 2 decimals; the calculated EF / SV are worked out from the typed EDV / ESV. The boxes
+  and the lelet keep the main program's rounding (EF 55 %). Exams saved before 2026-11-09 get these values in the
+  export too (calculated from their typed numbers).
 - **Exportálás (Excel)**: every exam in one table, one row per exam, every value (calculated ones too) as a column.
 
 ## Two computers: what protects you

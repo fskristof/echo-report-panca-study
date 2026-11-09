@@ -259,11 +259,11 @@
   /* ---------------- The exam that is open now ---------------- */
   // taj/file: where it is saved (file null = not saved yet); revision: the file's revision when opened / last saved
   const cur = { taj: "", file: null, revision: 0, visit: "", date: localDate(), created_at: "", created_by: "",
-                updated_at: "", updated_by: "", lock: null };
+                updated_at: "", updated_by: "", lock: null, note: "" };
   function resetCur() {
     releaseLock();
     Object.assign(cur, { taj: "", file: null, revision: 0, visit: "", date: localDate(), created_at: "", created_by: "",
-                         updated_at: "", updated_by: "", lock: null });
+                         updated_at: "", updated_by: "", lock: null, note: "" });
   }
   async function writeLock(taj, file) {
     try {
@@ -296,7 +296,7 @@
 
   // the visit and date count as changes too
   const pageSnapshot = snapshot;
-  snapshot = function () { return pageSnapshot() + "|" + cur.visit + "|" + cur.date; };
+  snapshot = function () { return pageSnapshot() + "|" + cur.visit + "|" + cur.date + "|" + cur.note; };
 
   const pageRefreshSave = refreshSaveButton;
   refreshSaveButton = function () {
@@ -371,9 +371,71 @@
       taj.addEventListener("blur", check);
       check();
     }
-    setTimeout(() => { drawVisitHint(); drawCurState(); });
+    setTimeout(() => { drawVisitHint(); drawCurState(); addStudyNote(line); });
     return line;
   };
+
+  /* ---------------- Vizsgálati megjegyzés (2026-11-09): saved with the exam, never in the report ---------------- */
+  // Its own class (not "text" / data-text-key), so the page never puts it into the report or the report's texts.
+  function addStudyNote(line) {
+    const card = line.closest(".card");
+    if (!card || card.querySelector(".study-note-box")) return;
+    const box = el("div", "study-note-box");
+    const lab = el("label", "", "Vizsgálati megjegyzés");
+    lab.append(el("span", "", " · csak a vizsgálati adatbázisba kerül, a leletbe nem"));
+    const ta = el("textarea");
+    ta.name = "echo-study-note"; ta.rows = 2; ta.spellcheck = false; ta.value = cur.note;
+    ta.placeholder = "Pl. protokolltól eltérés, mérési megjegyzés… (a másolt leletben nem jelenik meg)";
+    lab.htmlFor = ta.id = "study-note-text";
+    const fit = () => { ta.style.height = ""; if (ta.scrollHeight > ta.clientHeight) ta.style.height = ta.scrollHeight + 2 + "px"; };
+    ta.addEventListener("input", () => { cur.note = ta.value; fit(); refreshSaveButton(); });
+    box.append(lab, ta);
+    card.append(box);
+    setTimeout(fit);
+  }
+
+  /* ---------------- Study values to 2 decimals (2026-11-09) ---------------- */
+  // For the study data only: EF, EDV, ESV, SV and every strain value are stored (precise_values in the exam file) and
+  // exported rounded to 2 decimals, the calculated ones (SV = EDV - ESV, EF = SV / EDV; LA: SV = ESV - EDV,
+  // EF = SV / ESV) worked out from the typed numbers. The report and the boxes keep the main program's rounding.
+  const PRECISE_TYPED = ["edv", "esv", "lv3d_edv", "lv3d_esv", "rv3d_edv", "rv3d_esv", "lav", "la_edv", "la_esv",
+                         "gls", "rv_fwls", "rv_sls", "rv_gls", "lares", "la_cd", "la_ct"];
+  const PRECISE_CALC = ["ef", "lv_sv", "lv3d_ef", "lv3d_sv", "rv3d_ef", "rv3d_sv", "la_sv", "la_ef"];
+  const PRECISE_KEYS = [...PRECISE_TYPED, ...PRECISE_CALC];
+  const numText = (t) => (t !== undefined && t !== null && /^\s*-?\d+(?:[.,]\d+)?\s*$/.test(String(t)))
+    ? Number(String(t).trim().replace(",", ".")) : null;
+  function fmt2(x) {                               // half up, as the report does: 57,345 -> 57,35 (decimal comma)
+    const sign = x < 0 ? -1 : 1;
+    const a = Number(Math.round(Number(Math.abs(x).toFixed(9) + "e2")) + "e-2");
+    const text = (sign * a).toFixed(2);
+    return (text === "-0.00" ? "0.00" : text).replace(".", ",");
+  }
+  function preciseValues(typed) {                  // typed: the boxes typed by hand (exam.values)
+    typed = typed || {};
+    const out = {}, n = {};
+    for (const k of PRECISE_KEYS) {
+      const x = numText(typed[k]);
+      if (x !== null) { n[k] = x; out[k] = fmt2(x); }
+      else if (typed[k] !== undefined && String(typed[k]).trim()) out[k] = String(typed[k]).trim();   // e.g. EF "55-60"
+    }
+    const free = (k) => typed[k] === undefined;    // not typed and not emptied by hand ("" = emptied: left out)
+    for (const [ef, sv, edv, esv] of [["ef", "lv_sv", "edv", "esv"], ["lv3d_ef", "lv3d_sv", "lv3d_edv", "lv3d_esv"],
+                                      ["rv3d_ef", "rv3d_sv", "rv3d_edv", "rv3d_esv"]]) {
+      if (n[edv] && n[esv] !== undefined && n[edv] > n[esv]) {
+        if (free(sv)) out[sv] = fmt2(n[edv] - n[esv]);
+        if (free(ef)) out[ef] = fmt2((n[edv] - n[esv]) / n[edv] * 100);
+      }
+    }
+    // LA: LAV and LA ESV are the same volume (one copied into the other), SV = ESV - EDV, EF = SV / ESV
+    if (n.la_esv === undefined && n.lav !== undefined && free("la_esv")) { n.la_esv = n.lav; out.la_esv = fmt2(n.lav); }
+    if (n.lav === undefined && n.la_esv !== undefined && free("lav")) { n.lav = n.la_esv; out.lav = fmt2(n.la_esv); }
+    if (n.la_esv && n.la_edv !== undefined && n.la_esv > n.la_edv) {
+      if (free("la_sv")) out.la_sv = fmt2(n.la_esv - n.la_edv);
+      if (free("la_ef")) out.la_ef = fmt2((n.la_esv - n.la_edv) / n.la_esv * 100);
+    }
+    return out;
+  }
+  const studyValues = (e) => ({ ...(e.all_values || e.values || {}), ...(e.precise_values || preciseValues(e.values)) });
 
   /* ---------------- Fejléc tick boxes (study only, 2026-11-05) ---------------- */
   // The study needs only Pitvarfibrilláció, Extrasystoles, Szuboptimális echoablak and Sport on view, in one row under
@@ -573,6 +635,8 @@
       visit: cur.visit, visit_label: visitLabel(cur.visit), exam_date: cur.date,
       place: b.place, values: b.values, texts: b.texts, egyeb: b.egyeb,
       all_values: allValues(),
+      precise_values: preciseValues(b.values),     // EF, EDV, ESV, SV, strain to 2 decimals (study data only)
+      study_note: cur.note.trim(),                 // Vizsgálati megjegyzés: never in the report
       report_text: $("report").textContent,
       revision: (baseRevision || 0) + 1,
       created_at: created.at || nowIso, created_by: created.by || pcName(),
@@ -660,7 +724,8 @@
     state.patient = { name: (exam.patient && exam.patient.name) || p.name || "", taj };
     Object.assign(cur, { taj, file, revision: exam.revision || 0, visit: exam.visit || "", date: exam.exam_date || localDate(),
                          created_at: exam.created_at || "", created_by: exam.created_by || "",
-                         updated_at: exam.updated_at || "", updated_by: exam.updated_by || "" });
+                         updated_at: exam.updated_at || "", updated_by: exam.updated_by || "",
+                         note: exam.study_note || "" });
     updateCache(p);
     showResult({ form: out, report: out.report, transcript: "", full_transcript: "", pauses: [], timing: {}, manual: true });
     restoreValves(exam.values || {});
@@ -928,6 +993,7 @@
       el("br"), `Utolsó mentés: ${shownTime(exam.updated_at)}${exam.updated_by ? ", " + exam.updated_by : ""}`,
       el("br"), `Fájl: ${exam.file}`);
     const parts = [tabs, info];
+    if (exam.study_note) parts.push(el("div", "hist-h", "Vizsgálati megjegyzés"), el("div", "hist-note", exam.study_note));
     if (p.conflicts.includes(exam)) parts.push(el("div", "sb-warn",
       "Ez egy OneDrive ütközési másolat: két gép egyszerre mentette ugyanazt a vizsgálatot. Hasonlítsd össze a másik változattal."));
     // the values next to the ones being typed now (same patient)
@@ -977,7 +1043,7 @@
     if (!exams.length) { alert("Még nincs mentett vizsgálat."); return; }
     const used = new Set(), textKeys = new Set();
     for (const [, e] of exams) {
-      Object.keys(e.all_values || e.values || {}).forEach((k) => used.add(k));
+      Object.keys(studyValues(e)).forEach((k) => used.add(k));
       Object.entries(e.texts || {}).forEach(([k, v]) => { if (v && v.trim()) textKeys.add(k); });
     }
     const keys = [...meta.fields.map((f) => f.key).filter((k) => used.has(k)), ...[...used].filter((k) => !meta.byKey[k]).sort()];
@@ -990,13 +1056,14 @@
       return `${label}${f.unit ? ` (${f.unit})` : ""} [${k}]`;
     };
     const header = ["TAJ", "Név", "Vizit", "Vizsgálat dátuma", "Utolsó mentés", "Mentette", "Revízió", "Fájl", "Megjegyzés",
+                    "Vizsgálati megjegyzés",
                     ...keys.map(colName), ...[...textKeys].map((k) => `Szöveg: ${k}`), "Egyéb"];
     const lines = [header];
     exams.sort((a, b) => (a[0].name || "").localeCompare(b[0].name || "", "hu") || (a[1].exam_date || "").localeCompare(b[1].exam_date || ""));
     for (const [p, e, note] of exams) {
-      const v = e.all_values || e.values || {};
+      const v = studyValues(e);                    // EF, EDV, ESV, SV, strain: to 2 decimals
       lines.push([tajShown(p.taj), (e.patient && e.patient.name) || p.name, visitLabel(e.visit), e.exam_date || "", shownTime(e.updated_at),
-                  e.updated_by || "", String(e.revision || ""), e.file, note,
+                  e.updated_by || "", String(e.revision || ""), e.file, note, e.study_note || "",
                   ...keys.map((k) => v[k] || ""), ...[...textKeys].map((k) => (e.texts || {})[k] || ""), e.egyeb || ""]);
     }
     const cell = (s) => { s = String(s == null ? "" : s); return /[;"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };

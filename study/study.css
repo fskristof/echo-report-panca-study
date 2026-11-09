@@ -109,3 +109,14 @@ html.study #place, html.study select.place-sync, html.study #place-ask { display
 .hist-cmp td { padding: 3px 6px; border-top: 1px solid var(--sep); font-variant-numeric: tabular-nums; }
 .hist-cmp td.diff { font-weight: 600; }
 .hist-h { font-size: .8125rem; font-weight: 600; margin: 12px 0 6px; }
+
+/* ---------- Vizsgálati megjegyzés (study.js addStudyNote): study data only, never in the report ---------- */
+.study-note-box { margin-top: 12px; padding: 10px 12px 12px; border-radius: 12px; background: var(--study-tint); }
+.study-note-box label { display: block; font-size: .75rem; font-weight: 700; color: var(--study); margin-bottom: 6px;
+                        letter-spacing: .02em; }
+.study-note-box label span { font-weight: 500; color: var(--muted); }
+.study-note-box textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: .875rem; resize: vertical;
+  min-height: 44px; padding: 7px 10px; border: 0; border-radius: 9px; background: var(--card, #fff); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--sep); }
+.study-note-box textarea:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.hist-note { white-space: pre-wrap; font-size: .8125rem; padding: 8px 10px; border-radius: 9px; background: var(--study-tint); }
