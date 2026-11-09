@@ -65,7 +65,7 @@ Set up as a weekly scheduled task (no admin rights; the folder name is given her
 powershell -NoProfile -ExecutionPolicy Bypass -File backup\install_backup_task.ps1 -Source "<study folder>" -UsbLabel "<stick label>" -Day Friday -Time 17:00
 ```
 
-Add network folders with `-Extra "\pc\share\PancaBackup"` (several: `"a;b"`). Running it again replaces the task.
+Add network folders with `-Extra "\\pc\share\PancaBackup"` (several: `"a;b"`). Running it again replaces the task.
 If the computer is off at that time, the backup runs at the next start. Restore: unzip a backup and copy the patient
 folders back into the study folder (or open a single exam file from it).
 
