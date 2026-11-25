@@ -20,6 +20,10 @@ holds program code only.
 
 Both computers must choose **the same** OneDrive folder.
 
+If the patient list shows **"A mappa olvasása szokatlanul sokáig tart"** (after 20 s of "Betöltés…"), Chrome is waiting
+for OneDrive to download the files: set step 2 on that computer (and that Windows user), check OneDrive is running,
+signed in and not paused, wait for the green tick, then **Újrapróbálás**.
+
 One report layout only: **KAEC** (the study's reports go into PBEC, which has the same report box). There is no
 place picker and no "Hol dolgozol ma?" question. Elbocsátás has no fixed day, so it gets no expected date.
 

@@ -27,6 +27,7 @@
     { id: "egyeb", label: "Egyéb" },
   ];
   const SCHEDULE = VISITS.filter((v) => v.id !== "egyeb");
+  const LOAD_SLOW_MS = 20000;                      // reading the folder longer than this: the OneDrive hint
   const LOCK_STALE_MS = 12 * 3600 * 1000;          // an "editing" note older than this is ignored (crashed browser)
   const EXAM_RE = /^(\d{4}-\d{2}-\d{2})_([a-z0-9]+)(?:_(\d+))?\.json$/;
   const LOCK_SUFFIX = ".lock.json";
@@ -224,14 +225,14 @@
     if (!p.name) { const any = p.exams.find((e) => e.patient && e.patient.name); if (any) p.name = any.patient.name; }
     return p;
   }
-  async function scanRepo() {
+  async function scanRepo(store = true) {           // store: false = the caller decides (the browser: newest read only)
     const jobs = [];
     for await (const [name, h] of repo.dir.entries()) {
       if (h.kind === "directory" && /^\d{9}$/.test(name)) jobs.push(scanPatient(name, h));
     }
     const patients = (await Promise.all(jobs)).filter(Boolean);
     patients.sort((a, b) => (a.name || "￿").localeCompare(b.name || "￿", "hu") || a.taj.localeCompare(b.taj));
-    cache.patients = patients;
+    if (store) cache.patients = patients;
     return patients;
   }
   const cachedPatient = (taj) => (cache.patients || []).find((p) => p.taj === tajDigits(taj)) || null;
@@ -755,7 +756,8 @@
 
   /* ---------------- The patient browser on the home page ---------------- */
   let histValuesOpen = false;                       // Előzmény: the "Mért értékek" fold, closed by default
-  const browser = { open: new Set(), closed: new Set(), query: "", timer: null };   // closed: closed by hand during a search
+  const browser = { open: new Set(), closed: new Set(), query: "", timer: null,   // closed: closed by hand during a search
+                    scanGen: 0, scanning: false };                                  // the folder read now running
   function ensureBrowser() {
     if ($("study-card")) return;
     const note = el("p", "study-note");
@@ -768,10 +770,28 @@
   }
   loadSaved = async function () {
     ensureBrowser();
-    await initRepo();
     drawNote();
+    // never an empty card: "Betöltés…" at once, and a hint if even finding the folder takes too long
+    const card = $("study-card");
+    if (!card.childElementCount) card.replaceChildren(el("h2", "", "Betegek"), el("div", "sb-empty", "Betöltés…"));
+    let ready = false;
+    const slow = setTimeout(() => { if (!ready && !card.querySelector(".sb-head")) card.append(slowNote()); }, LOAD_SLOW_MS);
+    await initRepo();
+    ready = true; clearTimeout(slow);
     drawBrowser(true);
   };
+  // Reading the folder normally takes a second or two. When it hangs, it is almost always OneDrive: the files are
+  // only in the cloud ("Always keep on this device" not set on this computer) or OneDrive is paused / signed out,
+  // and Chrome waits for each file to download. The list cannot be drawn before the read ends, so say so.
+  function slowNote() {
+    const box = el("div", "sb-warn sb-slow");
+    box.append(el("b", "", "A mappa olvasása szokatlanul sokáig tart. "),
+      "Valószínűleg a OneDrive még tölti le a fájlokat a felhőből. Ellenőrizd ezen a gépen: fut-e a OneDrive és be vagy-e " +
+      "jelentkezve, nincs-e szüneteltetve a szinkronizálás. A Fájlkezelőben kattints jobb gombbal a vizsgálat mappájára → " +
+      "„Mindig maradjon ezen az eszközön” (Always keep on this device), várd meg a zöld pipát, majd: ",
+      button("Újrapróbálás", "", () => drawBrowser(true), "A mappa újraolvasása"));
+    return box;
+  }
   function drawNote() {
     $("study-note").textContent = "Panca vizsgálati változat. A leletek a kiválasztott (OneDrive) mappába mentődnek, " +
       "a program a böngészőben fut. Segédeszköz, nem orvostechnikai eszköz: a lelet tartalmáért a kitöltő orvos felel.";
@@ -813,16 +833,31 @@
       return;
     }
     if (rescan || !cache.patients) {
-      let err = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try { await scanRepo(); err = null; break; }
-        catch (e) {
-          err = e;
-          // a file or a lock note removed while the folder was being read (the other computer, or this page leaving
-          // an exam) also gives NotFoundError: only a folder that is really gone counts as "missing"; else read again
-          if (e.name !== "NotFoundError" || !(await repoAlive())) break;
+      // the first read: the header (search, buttons) and "Betöltés…" at once, never an empty card
+      if (!cache.patients) browserShell(true);
+      const gen = ++browser.scanGen;                  // Újrapróbálás starts a new read; only the newest one draws
+      browser.scanning = true;
+      const slow = setTimeout(() => {
+        if (gen !== browser.scanGen || card.querySelector(".sb-slow")) return;
+        const at = card.querySelector(".sb-folder");
+        if (at) at.after(slowNote()); else card.append(slowNote());
+      }, LOAD_SLOW_MS);
+      let err = null, patients = null;
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try { patients = await scanRepo(false); err = null; break; }
+          catch (e) {
+            err = e;
+            // a file or a lock note removed while the folder was being read (the other computer, or this page leaving
+            // an exam) also gives NotFoundError: only a folder that is really gone counts as "missing"; else read again
+            if (e.name !== "NotFoundError" || !(await repoAlive())) break;
+          }
         }
+      } finally {
+        if (gen === browser.scanGen) { clearTimeout(slow); browser.scanning = false; }
       }
+      if (gen !== browser.scanGen) return;            // a newer read has started: that one draws the list
+      if (patients) cache.patients = patients;
       if (err) {
         const e = err;
         if (e.name === "NotAllowedError" || e.name === "SecurityError") { repo.status = "prompt"; return drawBrowser(false); }
@@ -835,15 +870,22 @@
         return;
       }
     }
+    browserShell(false);
+  }
+  // the browser's header (search, Új beteg, Frissítés, Export), the folder line and the list. While the first read is
+  // running (loading): "Betöltés…" in the list, and Új beteg / Export / search wait for the patients
+  function browserShell(loading) {
+    const card = $("study-card");
     const head = el("div", "sb-head");
     const search = el("input");
     search.type = "search"; search.placeholder = "Keresés: név, TAJ, dátum"; search.value = browser.query;
     search.setAttribute("aria-label", "Keresés a betegek között");
     search.addEventListener("input", () => { browser.query = search.value; browser.closed.clear(); drawList(); });
-    head.append(el("h2", "", "Betegek"), search,
-      button("Új beteg", "primary", () => newExam(null), "Új beteg első vizsgálata"),
-      button("Frissítés", "", () => drawBrowser(true), "A mappa újraolvasása (a másik gép mentései)"),
-      button("Exportálás (Excel)", "", exportCsv, "Minden vizsgálat egy táblázatban, vizsgálatonként egy sor"));
+    const newBtn = button("Új beteg", "primary", () => newExam(null), "Új beteg első vizsgálata");
+    const exportBtn = button("Exportálás (Excel)", "", exportCsv, "Minden vizsgálat egy táblázatban, vizsgálatonként egy sor");
+    if (loading) search.disabled = newBtn.disabled = exportBtn.disabled = true;
+    head.append(el("h2", "", "Betegek"), search, newBtn,
+      button("Frissítés", "", () => drawBrowser(true), "A mappa újraolvasása (a másik gép mentései)"), exportBtn);
     const folder = el("div", "sb-folder");
     folder.append("Mappa: ", el("b", "", TEST ? "teszt (böngészőn belüli)" : repo.dir.name), " · Gép: ", el("b", "", pcName() || "—"),
       button("Gépnév", "link", async () => { await askPcName(); drawBrowser(false); }),
@@ -851,7 +893,8 @@
     const list = el("div");
     list.id = "sb-list";
     card.replaceChildren(head, folder, list);
-    drawList();
+    if (loading) list.append(el("div", "sb-empty", "Betöltés…"));
+    else drawList();
     drawProfile();
   }
   function drawList() {
@@ -947,8 +990,9 @@
   }
   // the list follows the other computer's saves: read again when this window comes back, and every 30 s on the home page
   const homeVisible = () => !$("pick").classList.contains("hidden") && document.visibilityState === "visible";
-  document.addEventListener("visibilitychange", () => { if (homeVisible() && repo.status === "ok") drawBrowser(true); });
-  setInterval(() => { if (homeVisible() && repo.status === "ok" && $("acct-dlg").classList.contains("hidden")) drawBrowser(true); }, 30000);
+  // (not while a read is still running: a hanging OneDrive read would otherwise pile up a new one every 30 s)
+  document.addEventListener("visibilitychange", () => { if (homeVisible() && repo.status === "ok" && !browser.scanning) drawBrowser(true); });
+  setInterval(() => { if (homeVisible() && repo.status === "ok" && !browser.scanning && $("acct-dlg").classList.contains("hidden")) drawBrowser(true); }, 30000);
 
   /* ---------------- Előzmény: earlier exams in the side panel, read only ---------------- */
   const pageDrawSide = drawSide;
