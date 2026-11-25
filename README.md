@@ -20,9 +20,12 @@ holds program code only.
 
 Both computers must choose **the same** OneDrive folder.
 
-If the patient list shows **"A mappa olvasása szokatlanul sokáig tart"** (after 20 s of "Betöltés…"), Chrome is waiting
-for OneDrive to download the files: set step 2 on that computer (and that Windows user), check OneDrive is running,
-signed in and not paused, wait for the green tick, then **Újrapróbálás**.
+If the patient list stays on "Betöltés…": Chrome's saved link to the folder can go bad on one computer (seen on a study
+PC on 2026-11-25: blank list, nothing in the console; choosing the folder again fixed it). The page now gives every
+call on that link 10 s and then asks to choose the folder again (**Mappa kiválasztása**, the same folder: nothing is
+lost). If the folder itself is slow to read, after 20 s it shows **"A mappa olvasása szokatlanul sokáig tart"** with
+**Mappa kiválasztása újra** (try first) and the OneDrive checks (running, signed in, not paused, step 2 on that
+computer and Windows user), then **Újrapróbálás**.
 
 One report layout only: **KAEC** (the study's reports go into PBEC, which has the same report box). There is no
 place picker and no "Hol dolgozol ma?" question. Elbocsátás has no fixed day, so it gets no expected date.

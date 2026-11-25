@@ -61,6 +61,15 @@
   const daysBetween = (a, b) => Math.round((Date.parse(b + "T12:00:00") - Date.parse(a + "T12:00:00")) / 86400000);
 
   /* ---------------- Small storage helpers: IndexedDB (the folder handle), files ---------------- */
+  // Chrome's saved link to the folder can go bad on one computer: then its calls neither answer nor fail, and the page
+  // waited for ever (blank patient list, 2026-11-25, study PC). Calls on the saved link get a time limit instead.
+  const LINK_TIMEOUT_MS = 10000;
+  function timeLimit(promise, ms = LINK_TIMEOUT_MS) {
+    let t;
+    return Promise.race([promise, new Promise((_, reject) => {
+      t = setTimeout(() => reject(new DOMException("A böngésző nem válaszolt", "TimeoutError")), ms);
+    })]).finally(() => clearTimeout(t));
+  }
   function idb() {
     return new Promise((resolve, reject) => {
       const r = indexedDB.open("echo-panca", 1);
@@ -103,7 +112,7 @@
   const lockName = (file) => file.replace(/\.json$/, LOCK_SUFFIX);
 
   /* ---------------- The folder (repository) ---------------- */
-  const repo = { dir: null, status: "none" };      // status: none | prompt | ok | unsupported
+  const repo = { dir: null, status: "none" };      // status: none | prompt | ok | unsupported | missing | stale
   let repoReady = null;
   function initRepo() {
     if (!repoReady) repoReady = (async () => {
@@ -117,12 +126,15 @@
       }
       if (!window.showDirectoryPicker) { repo.status = "unsupported"; return; }
       try {
-        const h = await kv("repo");
+        const h = await timeLimit(kv("repo"));
         if (h) {
           repo.dir = h;
-          repo.status = (await h.queryPermission({ mode: "readwrite" })) === "granted" ? "ok" : "prompt";
+          repo.status = (await timeLimit(h.queryPermission({ mode: "readwrite" }))) === "granted" ? "ok" : "prompt";
         }
-      } catch (e) { console.warn(e); }
+      } catch (e) {
+        console.warn("A mentett mappa-kapcsolat nem olvasható:", e);
+        repo.status = "stale";                          // the saved link does not answer: choose the folder again
+      }
     })();
     return repoReady;
   }
@@ -131,7 +143,7 @@
     try { h = await window.showDirectoryPicker({ id: "panca-study", mode: "readwrite" }); }
     catch (e) { if (e.name !== "AbortError") alert("Nem sikerült a mappát megnyitni: " + e.message); return false; }
     repo.dir = h; repo.status = "ok";
-    try { await kv("repo", h); } catch (e) { console.warn(e); }
+    try { await timeLimit(kv("repo", h)); } catch (e) { console.warn("A mappa-kapcsolat mentése nem sikerült:", e); }
     cache.patients = null;
     if (!pcName()) await askPcName();
     return true;
@@ -152,9 +164,10 @@
     if (repo.status === "unsupported") { alert("Ez a böngésző nem tud mappába menteni. Használd a Chrome-ot."); return false; }
     if (repo.status === "prompt" && (await grantFolder()) && (await repoAlive())) return true;
     if (repo.status === "prompt" || repo.status === "missing") repo.status = repo.dir && !(await repoAlive()) ? "missing" : repo.status;
-    const missing = repo.status === "missing";
-    const choice = await askChoice(missing ? "A mappa nem található" : "Válaszd ki a vizsgálat mappáját",
+    const missing = repo.status === "missing", stale = repo.status === "stale";
+    const choice = await askChoice(missing ? "A mappa nem található" : stale ? "Válaszd ki újra a mappát" : "Válaszd ki a vizsgálat mappáját",
       missing ? `A(z) „${repo.dir.name}” mappát átnevezték, áthelyezték vagy törölték. Válaszd ki újra a vizsgálat mappáját.`
+      : stale ? "A böngésző nem tud kapcsolódni a korábban kiválasztott mappához. Válaszd ki újra a vizsgálat mappáját (ugyanazt)."
               : "A leletek a Panca vizsgálat közös OneDrive mappájába mentődnek. Válaszd ki ezt a mappát.",
       [["cancel", "Mégse"], ["pick", "Mappa kiválasztása", "primary"]]);
     return choice === "pick" && (await chooseFolder());
@@ -162,7 +175,7 @@
   // the folder chosen earlier still exists? (renamed / moved / deleted folders break Chrome's link to it)
   async function repoAlive() {
     if (!repo.dir) return false;
-    try { for await (const _ of repo.dir.keys()) break; return true; }
+    try { await timeLimit((async () => { for await (const _ of repo.dir.keys()) break; })()); return true; }
     catch (e) { return e.name === "NotAllowedError" || e.name === "SecurityError"; }   // only a permission question
   }
 
@@ -786,9 +799,13 @@
   function slowNote() {
     const box = el("div", "sb-warn sb-slow");
     box.append(el("b", "", "A mappa olvasása szokatlanul sokáig tart. "),
-      "Valószínűleg a OneDrive még tölti le a fájlokat a felhőből. Ellenőrizd ezen a gépen: fut-e a OneDrive és be vagy-e " +
-      "jelentkezve, nincs-e szüneteltetve a szinkronizálás. A Fájlkezelőben kattints jobb gombbal a vizsgálat mappájára → " +
-      "„Mindig maradjon ezen az eszközön” (Always keep on this device), várd meg a zöld pipát, majd: ",
+      "Először válaszd ki újra a vizsgálat mappáját (ugyanazt): ez megjavítja, ha a böngésző mentett kapcsolata romlott el. ",
+      button("Mappa kiválasztása újra", "primary", async () => { if (await chooseFolder()) drawBrowser(true); },
+             "A vizsgálat mappájának újra kiválasztása"),
+      el("br"),
+      "Ha ez sem segít: ellenőrizd, hogy fut-e a OneDrive, be vagy-e jelentkezve, és nincs-e szüneteltetve. A Fájlkezelőben " +
+      "kattints jobb gombbal a mappára → „Mindig maradjon ezen az eszközön” (Always keep on this device), várd meg a zöld " +
+      "pipát, majd: ",
       button("Újrapróbálás", "", () => drawBrowser(true), "A mappa újraolvasása"));
     return box;
   }
@@ -819,6 +836,12 @@
                       "nem vesznek el."),
           button("Mappa kiválasztása", "primary", async () => { if (await chooseFolder()) drawBrowser(true); }), " ",
           button("Újrapróbálás", "", async () => { repo.status = "ok"; drawBrowser(true); }));
+      } else if (repo.status === "stale") {
+        setup.append(el("div", "sb-warn", "A böngésző nem tud kapcsolódni a korábban kiválasztott mappához (a mentett " +
+                                          "kapcsolat ezen a gépen elromlott)."),
+          el("p", "", "Válaszd ki újra a vizsgálat közös OneDrive mappáját (ugyanazt). A mentett vizsgálatok a mappában vannak, " +
+                      "nem vesznek el."),
+          button("Mappa kiválasztása", "primary", async () => { if (await chooseFolder()) drawBrowser(true); }));
       } else if (repo.status === "prompt") {
         setup.append(el("p", "", `A böngésző újra engedélyt kér a(z) „${repo.dir.name}” mappához (biztonsági okból, ` +
                                  "a böngésző újraindítása után egyszer)."),

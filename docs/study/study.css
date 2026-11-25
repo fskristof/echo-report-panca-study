@@ -125,3 +125,4 @@ html.study #place, html.study select.place-sync, html.study #place-ask { display
 .hist-values { margin: 12px 0 4px; border-top: 1px solid var(--sep); padding-top: 8px; }
 .hist-values summary { font-size: .8125rem; padding: 4px 0; }
 .hist-values[open] summary { margin-bottom: 4px; }
+.sb-slow button { margin: 6px 6px 6px 0; }
